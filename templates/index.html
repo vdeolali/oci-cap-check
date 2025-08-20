@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OCI Compute Capacity Reporter</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { margin-bottom: 5px; font-weight: bold; }
+        input, select { padding: 10px; border-radius: 4px; border: 1px solid #ccc; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        input[type="checkbox"] { width: auto; }
+        button { grid-column: 1 / -1; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        pre { background-color: #2b2b2b; color: #f0f0f0; padding: 15px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", Courier, monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OCI Compute Capacity Reporter</h1>
+        <form method="post">
+            <!-- Authentication Fields -->
+            <div class="form-group">
+                <label for="user_auth">Authentication Method</label>
+                <select id="user_auth" name="user_auth">
+                    <option value="cs" {% if form_data.user_auth == 'cs' %}selected{% endif %}>Cloud Shell</option>
+                    <option value="cf" {% if form_data.user_auth == 'cf' or not form_data.user_auth %}selected{% endif %}>Config File</option>
+                    <option value="ip" {% if form_data.user_auth == 'ip' %}selected{% endif %}>Instance Principals</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="config_profile">Config Profile</label>
+                <input type="text" id="config_profile" name="config_profile" placeholder="DEFAULT" value="{{ form_data.config_profile }}">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="config_file_path">Config File Path</label>
+                <input type="text" id="config_file_path" name="config_file_path" placeholder="~/.oci/config" value="{{ form_data.config_file_path }}">
+            </div>
+
+            <!-- Report Fields -->
+            <div class="form-group">
+                <label for="shape">Shape Name (Required)</label>
+                <input type="text" id="shape" name="shape" placeholder="e.g., VM.Standard.E4.Flex" value="{{ form_data.shape }}" required>
+            </div>
+             <div class="form-group">
+                <label for="target_region">Target Region</label>
+                <input type="text" id="target_region" name="target_region" placeholder="all_regions" value="{{ form_data.target_region }}">
+            </div>
+            <div class="form-group">
+                <label for="ocpus">OCPUs (for Flex shapes)</label>
+                <input type="number" id="ocpus" name="ocpus" placeholder="e.g., 4" value="{{ form_data.ocpus }}">
+            </div>
+            <div class="form-group">
+                <label for="memory">Memory (for Flex shapes)</label>
+                <input type="number" id="memory" name="memory" placeholder="e.g., 64" value="{{ form_data.memory }}">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="compartment">Compartment (if not admin)</label>
+                <input type="text" id="compartment" name="compartment" placeholder="ocid1.compartment.oc1..xxxx" value="{{ form_data.compartment }}">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="su" name="su" {% if 'su' in form_data %}checked{% endif %}>
+                <label for="su">Tenancy-level Admin Rights?</label>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="drcc" name="drcc" {% if 'drcc' in form_data %}checked{% endif %}>
+                <label for="drcc">DRCC Customer?</label>
+            </div>
+            
+            <button type="submit">Check Capacity</button>
+        </form>
+
+        {% if report_output %}
+        <h2>Report Result</h2>
+        <pre>{{ report_output }}</pre>
+        {% endif %}
+    </div>
+</body>
+</html>
+
