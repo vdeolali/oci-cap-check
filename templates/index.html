@@ -6,80 +6,78 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 2em; background-color: #f4f4f4; }
         .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1, h2 { color: #333; }
-        
-        /* New dark theme for the form container */
-        .form-container {
-            background-color: #1a2b4d; /* Dark bluish background */
-            padding: 30px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }
-
+        h1, h2, h3 { color: #333; }
+        .form-container { background-color: #1a2b4d; padding: 30px; border-radius: 8px; margin-bottom: 20px; }
         form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        
-        /* Update labels to be visible on the dark background */
-        .form-container label { 
-            margin-bottom: 5px; 
-            font-weight: bold; 
-            color: #ecf0f1; /* Light color for text */
-        }
-
+        .form-container label { margin-bottom: 5px; font-weight: bold; color: #ecf0f1; }
         .form-group { display: flex; flex-direction: column; }
-        
-        /* Update input and select fields for the dark theme */
-        .form-container input, .form-container select { 
-            padding: 10px; 
-            border-radius: 4px; 
-            border: 1px solid #566785;
-            background-color: #101c33;
-            color: #ffffff;
-            font-size: 14px;
-        }
-
-        .checkbox-group { display: flex; flex-direction: row; align-items: center; gap: 10px; }
-        input[type="checkbox"] { width: auto; }
-        button { grid-column: 1 / -1; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
+        .form-container input, .form-container select { padding: 10px; border-radius: 4px; border: 1px solid #566785; background-color: #101c33; color: #ffffff; font-size: 14px; }
+        .button-group { grid-column: 1 / -1; }
+        button { width: 100%; padding: 12px; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        .btn-connect { background-color: #6c757d; }
+        .btn-connect:hover { background-color: #5a6268; }
+        .btn-run { background-color: #007bff; }
+        .btn-run:hover { background-color: #0056b3; }
         pre { background-color: #2b2b2b; color: #f0f0f0; padding: 15px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", Courier, monospace; }
+        .error-banner { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>OCI Compute Capacity Reporter</h1>
+        
+        {% if error_message %}
+            <div class="error-banner"><strong>Error:</strong> {{ error_message }}</div>
+        {% endif %}
 
-        <!-- We wrap the form in our new dark container -->
+        <!-- /// FORM 1: Authentication /// -->
         <div class="form-container">
             <form method="post">
-                <!-- Authentication Fields -->
-                <div class="form-group">
-                    <label for="user_auth">Authentication Method</label>
-                    <select id="user_auth" name="user_auth">
-                        <option value="cs" {% if form_data.user_auth == 'cs' %}selected{% endif %}>Cloud Shell</option>
-                        <option value="cf" {% if form_data.user_auth == 'cf' or not form_data.user_auth %}selected{% endif %}>Config File</option>
-                        <option value="ip" {% if form_data.user_auth == 'ip' %}selected{% endif %}>Instance Principals</option>
-                    </select>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Step 1: Connect to your OCI Tenancy</label>
                 </div>
                 <div class="form-group">
                     <label for="config_profile">Config Profile</label>
-                    <input type="text" id="config_profile" name="config_profile" placeholder="DEFAULT" value="{{ form_data.config_profile }}">
+                    <input type="text" id="config_profile" name="config_profile" value="{{ form_data.config_profile or 'CVM' }}">
                 </div>
+                <div class="form-group">
+                    <label for="config_file_path">Full Config File Path</label>
+                    <input type="text" id="config_file_path" name="config_file_path" value="{{ form_data.config_file_path or '/Users/vdeolali/.oci/config' }}">
+                </div>
+                <input type="hidden" name="user_auth" value="cf">
+                
+                <div class="button-group">
+                    <button type="submit" name="action" value="load_data" class="btn-connect">Connect & Load Tenancy Data</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- /// FORM 2: Run Report (only shows after successful connection) /// -->
+        {% if shape_list %}
+        <div class="form-container">
+            <form method="post">
+                <!-- Hidden fields to pass auth details again -->
+                <input type="hidden" name="user_auth" value="cf">
+                <input type="hidden" name="config_profile" value="{{ form_data.config_profile }}">
+                <input type="hidden" name="config_file_path" value="{{ form_data.config_file_path }}">
+
                 <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="config_file_path">Config File Path</label>
-                    <input type="text" id="config_file_path" name="config_file_path" placeholder="~/.oci/config" value="{{ form_data.config_file_path }}">
+                    <label>Step 2: Configure and Run Capacity Report</label>
                 </div>
 
-                <!-- Report Fields -->
                 <div class="form-group">
-                    <label for="shape">Shape Name (Required)</label>
-                    <input type="text" id="shape" name="shape" placeholder="e.g., VM.Standard.E4.Flex" value="{{ form_data.shape }}" required>
+                    <label for="shape">Shape Name</label>
+                    <select id="shape" name="shape" required>
+                        <option value="" disabled selected>-- Select a Shape --</option>
+                        {% for shape in shape_list %}
+                            <option value="{{ shape }}" {% if form_data.shape == shape %}selected{% endif %}>{{ shape }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="form-group">
-                    <!-- ##### THIS IS THE NEW DROPDOWN ##### -->
                     <label for="target_region">Target Region</label>
                     <select id="target_region" name="target_region">
-                        <option value="all_regions" {% if form_data.target_region == 'all_regions' or not form_data.target_region %}selected{% endif %}>All Subscribed Regions (Default)</option>
-                        <!-- Loop through the regions passed from Flask -->
+                        <option value="all_regions" {% if form_data.target_region == 'all_regions' %}selected{% endif %}>All Subscribed Regions</option>
                         {% for region in oci_regions %}
                             <option value="{{ region }}" {% if form_data.target_region == region %}selected{% endif %}>{{ region }}</option>
                         {% endfor %}
@@ -94,8 +92,8 @@
                     <input type="number" id="memory" name="memory" placeholder="e.g., 64" value="{{ form_data.memory }}">
                 </div>
                 <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="compartment">Compartment (if not admin)</label>
-                    <input type="text" id="compartment" name="compartment" placeholder="ocid1.compartment.oc1..xxxx" value="{{ form_data.compartment }}">
+                    <label for="compartment">Compartment OCID (if not admin)</label>
+                    <input type="text" id="compartment" name="compartment" value="{{ form_data.compartment }}">
                 </div>
                 <div class="form-group checkbox-group">
                     <input type="checkbox" id="su" name="su" {% if 'su' in form_data %}checked{% endif %}>
@@ -105,14 +103,20 @@
                     <input type="checkbox" id="drcc" name="drcc" {% if 'drcc' in form_data %}checked{% endif %}>
                     <label for="drcc">DRCC Customer?</label>
                 </div>
-                
-                <button type="submit">Check Capacity</button>
+
+                <div class="button-group">
+                    <button type="submit" name="action" value="run_report" class="btn-run">Run Capacity Report</button>
+                </div>
             </form>
         </div>
+        {% endif %}
 
+        <!-- /// Results Display /// -->
         {% if report_output %}
-        <h2>Report Result</h2>
-        <pre>{{ report_output }}</pre>
+        <div class="results-container">
+            <h2>Report Result</h2>
+            <pre>{{ report_output }}</pre>
+        </div>
         {% endif %}
     </div>
 </body>
